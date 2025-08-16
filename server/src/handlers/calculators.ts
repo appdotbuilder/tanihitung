@@ -1,111 +1,103 @@
+import { db } from '../db';
+import { calculatorsTable } from '../db/schema';
 import { type Calculator, type CreateCalculatorInput } from '../schema';
+import { eq, ilike, or, asc, desc } from 'drizzle-orm';
 
 export async function getCalculators(): Promise<Calculator[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch all calculators from the database,
-    // ordered by category and name for display in the calculators list page.
-    return [
-        {
-            id: 1,
-            name: "Fertilizer Requirement",
-            slug: "fertilizer-requirement",
-            description: "Calculate how much fertilizer you need for your farm area",
-            category: "farming" as const,
-            unit_label: "kg",
-            formula_key: "fertilizer-requirement",
-            created_at: new Date(),
-            updated_at: new Date()
-        },
-        {
-            id: 2,
-            name: "Chicken Daily Feed Requirement",
-            slug: "chicken-feed-daily",
-            description: "Calculate daily feed requirement for your chickens",
-            category: "livestock" as const,
-            unit_label: "kg/day",
-            formula_key: "chicken-feed-daily",
-            created_at: new Date(),
-            updated_at: new Date()
-        },
-        {
-            id: 3,
-            name: "Livestock Medicine Dosage",
-            slug: "livestock-medicine-dosage",
-            description: "Calculate proper medicine dosage based on animal weight",
-            category: "livestock" as const,
-            unit_label: "mg",
-            formula_key: "livestock-medicine-dosage",
-            created_at: new Date(),
-            updated_at: new Date()
-        },
-        {
-            id: 4,
-            name: "Harvest Estimation",
-            slug: "harvest-estimation",
-            description: "Estimate your harvest yield based on farm area",
-            category: "farming" as const,
-            unit_label: "ton",
-            formula_key: "harvest-estimation",
-            created_at: new Date(),
-            updated_at: new Date()
-        },
-        {
-            id: 5,
-            name: "Planting Cost",
-            slug: "planting-cost",
-            description: "Calculate total planting costs for your farm area",
-            category: "farming" as const,
-            unit_label: "Rp",
-            formula_key: "planting-cost",
-            created_at: new Date(),
-            updated_at: new Date()
-        }
-    ];
+  try {
+    // Fetch all calculators ordered by category and name for display in the calculators list page
+    const results = await db.select()
+      .from(calculatorsTable)
+      .orderBy(asc(calculatorsTable.category), asc(calculatorsTable.name))
+      .execute();
+
+    // Return results directly - no numeric conversions needed for this table
+    return results;
+  } catch (error) {
+    console.error('Failed to fetch calculators:', error);
+    throw error;
+  }
 }
 
 export async function getCalculatorBySlug(slug: string): Promise<Calculator | null> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch a specific calculator by its slug
-    // for display on individual calculator pages.
-    const calculators = await getCalculators();
-    return calculators.find(calc => calc.slug === slug) || null;
+  try {
+    // Fetch a specific calculator by its slug for display on individual calculator pages
+    const results = await db.select()
+      .from(calculatorsTable)
+      .where(eq(calculatorsTable.slug, slug))
+      .execute();
+
+    return results[0] || null;
+  } catch (error) {
+    console.error('Failed to fetch calculator by slug:', error);
+    throw error;
+  }
 }
 
 export async function getCalculatorsByCategory(category?: "farming" | "livestock"): Promise<Calculator[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to fetch calculators filtered by category
-    // for the category filter functionality.
-    const calculators = await getCalculators();
-    if (!category) return calculators;
-    return calculators.filter(calc => calc.category === category);
+  try {
+    // Build query conditionally to avoid TypeScript type issues
+    const baseQuery = db.select().from(calculatorsTable);
+
+    const results = category 
+      ? await baseQuery
+          .where(eq(calculatorsTable.category, category))
+          .orderBy(asc(calculatorsTable.name))
+          .execute()
+      : await baseQuery
+          .orderBy(asc(calculatorsTable.name))
+          .execute();
+
+    return results;
+  } catch (error) {
+    console.error('Failed to fetch calculators by category:', error);
+    throw error;
+  }
 }
 
 export async function createCalculator(input: CreateCalculatorInput): Promise<Calculator> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to create a new calculator in the database
-    // (mainly used for seeding initial data).
-    return {
-        id: Math.floor(Math.random() * 1000), // Placeholder ID
+  try {
+    // Create a new calculator in the database (mainly used for seeding initial data)
+    const result = await db.insert(calculatorsTable)
+      .values({
         name: input.name,
         slug: input.slug,
         description: input.description,
         category: input.category,
         unit_label: input.unit_label,
-        formula_key: input.formula_key,
-        created_at: new Date(),
-        updated_at: new Date()
-    };
+        formula_key: input.formula_key
+      })
+      .returning()
+      .execute();
+
+    return result[0];
+  } catch (error) {
+    console.error('Calculator creation failed:', error);
+    throw error;
+  }
 }
 
 export async function searchCalculators(query: string): Promise<Calculator[]> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to search calculators by name, description, or category
-    // for the search functionality on the home page.
-    const calculators = await getCalculators();
-    const lowercaseQuery = query.toLowerCase();
-    return calculators.filter(calc => 
-        calc.name.toLowerCase().includes(lowercaseQuery) ||
-        calc.description.toLowerCase().includes(lowercaseQuery) ||
-        calc.category.toLowerCase().includes(lowercaseQuery)
+  try {
+    // Search calculators by name, description, or category
+    // Since we can't use ilike on enum columns, fetch all and filter in application
+    const allResults = await db.select()
+      .from(calculatorsTable)
+      .orderBy(asc(calculatorsTable.category), asc(calculatorsTable.name))
+      .execute();
+
+    // Filter results in application code for all searchable fields
+    // Trim whitespace from query for better search experience
+    const lowercaseQuery = query.trim().toLowerCase();
+    const filteredResults = allResults.filter(calc => 
+      calc.name.toLowerCase().includes(lowercaseQuery) ||
+      calc.description.toLowerCase().includes(lowercaseQuery) ||
+      calc.category.toLowerCase().includes(lowercaseQuery)
     );
+
+    return filteredResults;
+  } catch (error) {
+    console.error('Failed to search calculators:', error);
+    throw error;
+  }
 }

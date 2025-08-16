@@ -1,11 +1,9 @@
-import { type CreateCalculatorInput } from '../schema';
-import { createCalculator } from './calculators';
+import { db } from '../db';
+import { calculatorsTable, usersTable } from '../db/schema';
+import { type CreateCalculatorInput, type CreateUserInput } from '../schema';
+import { eq } from 'drizzle-orm';
 
 export async function seedCalculators(): Promise<void> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to seed the database with initial calculator data
-    // for the 5 required calculators specified in the requirements.
-    
     const initialCalculators: CreateCalculatorInput[] = [
         {
             name: "Fertilizer Requirement",
@@ -49,28 +47,76 @@ export async function seedCalculators(): Promise<void> {
         }
     ];
 
-    // Create each calculator
-    for (const calculatorData of initialCalculators) {
-        try {
-            await createCalculator(calculatorData);
-            console.log(`Created calculator: ${calculatorData.name}`);
-        } catch (error) {
-            console.error(`Failed to create calculator ${calculatorData.name}:`, error);
+    try {
+        // Create each calculator
+        for (const calculatorData of initialCalculators) {
+            // Check if calculator already exists
+            const existing = await db.select()
+                .from(calculatorsTable)
+                .where(eq(calculatorsTable.slug, calculatorData.slug))
+                .execute();
+
+            if (existing.length === 0) {
+                await db.insert(calculatorsTable)
+                    .values({
+                        name: calculatorData.name,
+                        slug: calculatorData.slug,
+                        description: calculatorData.description,
+                        category: calculatorData.category,
+                        unit_label: calculatorData.unit_label,
+                        formula_key: calculatorData.formula_key
+                    })
+                    .execute();
+
+                console.log(`Created calculator: ${calculatorData.name}`);
+            } else {
+                console.log(`Calculator already exists: ${calculatorData.name}`);
+            }
         }
+        
+        console.log('Calculator seeding completed');
+    } catch (error) {
+        console.error('Calculator seeding failed:', error);
+        throw error;
     }
-    
-    console.log('Calculator seeding completed');
 }
 
 export async function seedTestUser(): Promise<void> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to create a test user for development/testing purposes.
-    console.log('Test user seeding completed');
+    const testUserData: CreateUserInput = {
+        name: "Test User",
+        email: "test@example.com",
+        password: "password123"
+    };
+
+    try {
+        // Check if test user already exists
+        const existing = await db.select()
+            .from(usersTable)
+            .where(eq(usersTable.email, testUserData.email))
+            .execute();
+
+        if (existing.length === 0) {
+            await db.insert(usersTable)
+                .values({
+                    name: testUserData.name,
+                    email: testUserData.email,
+                    password: testUserData.password // In real implementation, this would be hashed
+                })
+                .execute();
+
+            console.log(`Created test user: ${testUserData.email}`);
+        } else {
+            console.log(`Test user already exists: ${testUserData.email}`);
+        }
+
+        console.log('Test user seeding completed');
+    } catch (error) {
+        console.error('Test user seeding failed:', error);
+        throw error;
+    }
 }
 
 export async function runSeeds(): Promise<void> {
-    // This is a placeholder declaration! Real code should be implemented here.
-    // The goal of this handler is to run all seeding functions in the correct order.
     console.log('Starting database seeding...');
     
     try {
